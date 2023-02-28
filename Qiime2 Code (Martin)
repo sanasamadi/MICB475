@@ -1,1 +1,133 @@
 
+#QIIME2 CODES
+
+# Login credentials
+ssh root10.19.139.120 # Password: Biome1403
+
+# Create new detached screen session
+screen -S project_2
+
+# Activate QIIME2
+conda activate qiime2-2021.11
+
+# Navigate to working directory
+cd /data
+
+# Copy colombia data into working directory
+cp -r /mnt/datasets/project_2/colombia .
+
+# Importing and demultiplexing
+qiime tools import \
+  --type "SampleData[SequencesWithQuality]" \
+  --input-format SingleEndFastqManifestPhred33V2 \
+  --input-path ./colombia_manifest.txt \
+  --output-path ./demux.qza
+
+# Create visualization of demultiplexed samples
+qiime demux summarize \
+  --i-data demux.qza \
+  --o-visualization demux.qzv
+
+# Transfer visualization file to local laptop
+scp root@10.19.139.120:/data/colombia/demux.qzv .
+
+# Determine ASVs with DADA2
+qiime dada2 denoise-single \
+  --i-demultiplexed-seqs demux.qza \
+  --p-trim-left 0 \
+  --p-trunc-len 250 \
+  --o-representative-sequences rep-seqs.qza \
+  --o-table table.qza \
+  --o-denoising-stats stats.qza
+
+# Visualize DADA2 stats
+qiime metadata tabulate \
+  --m-input-file stats.qza \
+  --o-visualization stats.qzv
+
+# Visualize ASVs stats
+qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file /data/colombia/colombia_metadata.txt
+  
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+# Transfer visualization file to local laptop
+scp root@10.19.139.120:/data/colombia/stats.qzv .
+
+scp root@10.19.139.120:/data/colombia/table.qzv .
+
+scp root@10.19.139.120:/data/colombia/rep-seqs.qzv .
+
+# Extract your amplicon of interest from the reference database
+qiime feature-classifier extract-reads \
+  --i-sequences /mnt/datasets/silva_ref_files/silva-138-99-seqs.qza \
+  --p-f-primer GTGCCAGCMGCCGCGGTAA \
+  --p-r-primer GGACTACHVGGGTWTCTAAT \
+  --p-trunc-len 250 \
+  --o-reads ref-seqs-trimmed.qza
+
+# Train classifier with your new ref-seq file
+qiime feature-classifier fit-classifier-naive-bayes \
+  --i-reference-reads ref-seqs-trimmed.qza \
+  --i-reference-taxonomy /mnt/datasets/silva_ref_files/silva-138-99-tax.qza \
+  --o-classifier classifier.qza
+
+# Use the trained classifier to assign taxonomy to your reads (rep-seqs.qza)
+qiime feature-classifier classify-sklearn \
+  --i-classifier classifier.qza \
+  --i-reads rep-seqs.qza \
+  --o-classification taxonomy.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy.qza \
+  --o-visualization taxonomy.qzv
+  
+# Taxonomy barplots
+qiime taxa barplot \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --m-metadata-file /data/colombia/colombia_metadata.txt \
+  --o-visualization taxa-bar-plots.qzv
+
+# Transfer visualization file to local laptop
+scp root@10.19.139.120:/data/colombia/taxonomy.qzv .
+
+scp root@10.19.139.120:/data/colombia/taxa-bar-plots.qzv .
+
+# Filter mitochondria and chloroplast
+qiime taxa filter-table \
+   --i-table table.qza \
+   --i-taxonomy taxonomy.qza \
+   --p-exclude mitochondria,chloroplast \
+   --o-filtered-table table-no-mitochondria-no-chloroplast.qza
+
+qiime feature-table summarize \
+   --i-table table-no-mitochondria-no-chloroplast.qza \
+   --o-visualization table-no-mitochondria-no-chloroplast.qzv \
+   --m-sample-metadata-file colombia_metadata.txt
+
+# Transfer visualization file to local laptop
+scp root@10.19.139.120:/data/colombia/table-no-mitochondria-no-chloroplast.qzv .
+
+# Generate a tree for phylogenetic diversity analyses
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza 
+
+# Alpha-rarefaction  
+qiime diversity alpha-rarefaction \
+    --i-table table.qza \
+    --i-phylogeny rooted-tree.qza \
+    --p-max-depth XXXX \
+    --m-metadata-file colombia_metadata.txt
+    --o-visualization alpha-rarefaction.qzv
+
+# Transfer visualization file to local laptop
+scp root@10.19.139.120:/data/colombia/alpha-rarefaction.qzv .
