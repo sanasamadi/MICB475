@@ -3,8 +3,10 @@ library(ape)
 library(tidyverse)
 
 
+#Load data
+
 #Filtering out redundant columns
-subset(Data, select = -c(age_range, BMI_class, country))
+meta_filtered <- select(meta, -c(age_range, BMI_class, country))
 
 
 #### Format OTU table ####
@@ -32,24 +34,37 @@ atacama <- phyloseq(OTU, SAMP)
 
 
 ##How to create additional column for Shannon?
+estimate_richness(phyloseqObject, measures = c("Shannon"))
+
 
 
 #### Alpha diversity ######
 
-plot_richness(Data, measures = c("Shannon")) 
+#can make a new folder
+dir.create("AlphaDiversity")
 
-gg_richness <- plot_richness(atacama_rare, x = "vegetation", measures = c("Shannon","Chao1")) +
-  xlab("Vegetation present") +
-  geom_boxplot()
-gg_richness
+#creates vector with just metadata cetrgory names
+Y <- colnames(sample_data(phyloseq object)))
 
-ggsave(filename = "Module13/plot_richness.png"
+#Loop for alpha diversity plots
+#Remember to change file paths
+for (x in Y) {
+plot_richness(phyloseq object, x = x, measures = c("Shannon")) +
+  geom_boxplot() +
+  ggsave(filename = paste0("Module13/plot_richness_",x,".png")
        , gg_richness
        , height=4, width=6)
+       }
 
 
 
 #### Beta diversity #####
+
+
+#can make a new folder
+dir.create("BetaDiversity")
+
+
 bc_dm <- distance(atacama_rare, method="bray")
 
 pcoa_bc <- ordinate(atacama_rare, method="PCoA", distance=bc_dm)
