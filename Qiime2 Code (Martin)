@@ -123,17 +123,29 @@ qiime diversity core-metrics-phylogenetic \
   --p-sampling-depth 20655 \
   --m-metadata-file colombia_metadata.txt \
   --output-dir core-metrics-results
-
-# Calculate alpha-group-significance
-qiime diversity alpha-group-significance \
-  --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
-  --m-metadata-file /mnt/datasets/project_1/moving_pictures/sample-metadata.tsv \
-  --o-visualization core-metrics-results/faith-pd-group-significance.qzv
-
-qiime diversity alpha-group-significance \
-  --i-alpha-diversity core-metrics-results/evenness_vector.qza \
-  --m-metadata-file colombia_metadata.txt \
-  --o-visualization core-metrics-results/evenness-group-significance.qzv
   
+# Export ASV table 
+qiime tools export \
+  --input-path table.qza \
+  --output-path exported-feature-table
+
+qiime tools export \
+  --input-path rooted-tree.qza \
+  --output-path exported-tree
+
+qiime tools export \
+  --input-path taxonomy.qza \
+  --output-path exported-taxonomy
+
+qiime tools export \
+  --input-path rep-seqs.qza \
+  --output-path exported-rep-seqs
+
+# Export ASV table
+biom convert \
+-i exported-feature-table/feature-table.biom \
+--to-tsv \
+-o exported-feature-table/feature-table.txt
+
 # Transfer all files to local computer to be shared with group
 scp -r root@10.19.139.120:/data/colombia .
