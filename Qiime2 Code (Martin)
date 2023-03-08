@@ -92,6 +92,12 @@ qiime taxa barplot \
   --m-metadata-file colombia_metadata.txt \
   --o-visualization taxa-bar-plots.qzv
 
+qiime taxa filter-table \
+  --i-table table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-exclude d__Eukaryota,mitochondria,chloroplast \
+  --o-filtered-table table-no-mitochondria-no-chloroplast.qza
+
 # Transfer visualization file to local laptop
 scp root@10.19.139.120:/data/colombia/taxonomy.qzv .
 
@@ -126,7 +132,7 @@ qiime diversity core-metrics-phylogenetic \
   
 # Export ASV table 
 qiime tools export \
-  --input-path table.qza \
+  --input-path table-no-mitochondria-no-chloroplast.qza \
   --output-path exported-feature-table
 
 qiime tools export \
