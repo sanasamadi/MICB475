@@ -4,6 +4,11 @@ library(tidyverse)
 
 
 #Load data
+otu <- read.delim("feature-table.txt"m skip = 1)
+meta <- read.delim("colombia_metadata.txt")
+tax <- read.delim("taxonomy.tsv")
+phylotree <- read.tree("tree.nwk")
+
 
 #Filtering out redundant columns
 meta_filtered <- select(meta, -c(age_range, BMI_class, country))
@@ -20,21 +25,31 @@ OTU <- otu_table(otu_mat, taxa_are_rows = TRUE)
 
 #### Format sample metadata ####
 # Save everything except sampleid as new data frame
-samp_df <- as.data.frame(meta[,-1])
+samp_df <- as.data.frame(meta_filtered[,-1])
 # Make sampleids the rownames
-rownames(samp_df)<- meta$sampleid
+rownames(samp_df)<- meta_filtered$X.SampleID
 # Make phyloseq sample data with sample_data() function
 SAMP <- sample_data(samp_df)
 
+#### Formatting taxonomy ####
+# Convert taxon strings to a table with separate taxa rank columns
+tax_mat <- tax %>%
+  separate(col=Taxon, sep="; "
+           , into = c("Domain","Phylum","Class","Order","Family","Genus","Species")) %>%
+  as.matrix() # Saving as a matrix
+# Make sampleids the rownames
+rownames(tax_mat) <- tax$`Feature ID`
+# Make taxa table
+TAX <- tax_table(tax_mat)
 
 
 #### Create phyloseq object ####
 # Merge all into a phyloseq object
-atacama <- phyloseq(OTU, SAMP)
+COLOMBIA <- phyloseq(OTU, SAMP, TAX, phylotree)
 
 
-##How to create additional column for Shannon?
-estimate_richness(phyloseqObject, measures = c("Shannon"))
+##create additional column for Shannon
+estimate_richness(COLOMBIA, measures = c("Shannon"))
 
 
 
@@ -44,12 +59,12 @@ estimate_richness(phyloseqObject, measures = c("Shannon"))
 dir.create("AlphaDiversity")
 
 #creates vector with just metadata cetrgory names
-Y <- colnames(sample_data(phyloseq object)))
+Y <- colnames(sample_data(COLOMBIA)))
 
 #Loop for alpha diversity plots
 #Remember to change file paths
 for (x in Y) {
-plot_richness(phyloseq object, x = x, measures = c("Shannon")) +
+plot_richness(COLOMBIA, x = x, measures = c("Shannon")) +
   geom_boxplot() +
   ggsave(filename = paste0("Module13/plot_richness_",x,".png")
        , gg_richness
