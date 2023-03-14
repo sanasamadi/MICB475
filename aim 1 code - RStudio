@@ -42,6 +42,14 @@ rownames(tax_mat) <- tax$`Feature ID`
 # Make taxa table
 TAX <- tax_table(tax_mat)
 
+###Adressing error from samples not matching in OTU and TAX files###
+ASV_in_common <- intersect(rownames(otu_mat), rownames(tax_mat))
+otu_mat <- otu_mat[ match( ASV_in_common, rownames(otu_mat) ), ]
+tax_mat <- tax_mat[  match( rownames(tax_mat), ASV_in_common), ]
+
+OTU <- otu_table(otu_mat)
+
+TAX <- taxa_table(tax_mat)
 
 #### Create phyloseq object ####
 # Merge all into a phyloseq object
