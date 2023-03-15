@@ -29,7 +29,7 @@ OTU <- otu_table(otu_mat, taxa_are_rows = TRUE)
 
 #### Format sample metadata ####
 # Save everything except sampleid as new data frame
-samp_df <- as.data.frame(meta_select[,-1]) %>% drop_na(systolic_bp)
+samp_df <- as.data.frame(meta_select[,-1]) #%>% drop_na(systolic_bp)
 # Make sampleids the rownames
 colnames(meta)
 rownames(samp_df)<- meta_select$`#SampleID`
