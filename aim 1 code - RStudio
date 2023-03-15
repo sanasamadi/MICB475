@@ -45,7 +45,9 @@ TAX <- tax_table(tax_mat)
 ###Adressing error from samples not matching in OTU and TAX files###
 ASV_in_common <- intersect(rownames(otu_mat), rownames(tax_mat))
 otu_mat <- otu_mat[ match( ASV_in_common, rownames(otu_mat) ), ]
-tax_mat <- tax_mat[  match( rownames(tax_mat), ASV_in_common), ]
+tax_mat <- tax_mat[  match( ASV_in_common, rownames(tax_mat) ), ]
+rownames(otu_mat) <- ASV_in_common
+rownames(tax_mat) <- ASV_in_common
 
 OTU <- otu_table(otu_mat)
 
