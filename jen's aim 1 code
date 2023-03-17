@@ -80,13 +80,14 @@ shannon_vec <- estrich$Shannon
 
 # alpha diversity loop
 resultsListalpha <- list()
-for ( x in allPredictors ) {
+
+for ( i in allPredictors ) {
   # making linear model
-  model <- lm(shannon_vec ~ get(x), data = sampdata)
+  model <- lm(shannon_vec ~ get(i), data = sampdata)
   # saving the model summary
   modelsummary <- summary(model)
   # saving the modelsummary in our list
-  resultsListalpha[[x]] <- modelsummary
+  resultsListalpha[[i]] <- modelsummary
   
 }
 
@@ -107,8 +108,8 @@ sink() # closes the file and saves it)
 # loop for alpha diversity plots
 richness_plots <- list()
 
-for (x in allPredictors) {
-  richness_plots[[x]] <- plot_richness(COLOMBIA_final, x = x, measures = c("Shannon")) +
+for (i in allPredictors) {
+  richness_plots[[i]] <- plot_richness(COLOMBIA_final, i = i, measures = c("Shannon")) +
     geom_boxplot() +
     theme(axis.text.x = element_text(angle = 0, hjust = 1))
   
@@ -124,6 +125,8 @@ for (i in seq_along(allPredictors)) {
  
 }
 
+
+
 # go back to parent directory if a new directory was made
 setwd("..")
 
@@ -136,12 +139,12 @@ dm <- distance(otu_table(COLOMBIA_final), method="bray")
 # beta diversity loop
 resultsListbeta <- list()
 
-for ( x in allPredictors ) {
-  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 10000)
+for ( i in allPredictors ) {
+  permanova_results <- adonis2(dm ~ get(i), data = sampdata, permutations = 10000)
   # saving the summary
   permanova_summary <- summary(permanova_results)
   # saving the modelsummary to the list
-  resultsListbeta[[x]] <- permanova_summary
+  resultsListbeta[[i]] <- permanova_summary
   
 }
 resultsListbeta 
@@ -154,3 +157,27 @@ setwd("BetaDiversity")
 sink(file="resultsListbeta_bray_all_predictors.txt") 
 resultsListbeta # Captures this output
 sink() # closes the file and saves it)
+
+#!!! loop for beta diversity plots!!!
+pcoa_dm <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm)
+
+bray_plots <- list()
+
+for (i in allPredictors) {
+  bray_plots[[i]] <- plot_ordination(COLOMBIA_final, pcoa_dm, color = i) +
+    labs(title = i)
+  
+}
+
+bray_plots
+
+# save all plot objects using ggsave
+for (i in seq_along(allPredictors)) {
+  ggsave(filename = paste0("plot_pcoa_", allPredictors[i], ".png"), 
+         plot = bray_plots[[i]], 
+         height = 4, width = 6)
+  
+}
+
+# go back to parent directory if a new directory was made
+setwd("..")
