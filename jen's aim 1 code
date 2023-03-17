@@ -1,152 +1,156 @@
-#load packages
+# load packages
 req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
 lapply(req_packages, library, character.only = TRUE)
 
-#Load data
+# load data
 otu <- read_tsv("feature-table.txt", skip = 1)
 meta <- read_tsv("colombia_metadata.txt")
 tax <- read_tsv("taxonomy.tsv")
 phylotree <- read.tree("tree.nwk")
 
-#Removing redundant columns
+# removing redundant columns
 select <- dplyr::select
 meta_select <- meta |>
   select(-c(age_range, country))
 colnames(meta_select)
 
-#ghaz removed BMI_class, but BMI is numerical and BMI_class is categorical?
-#see code below
-str(meta$BMI)
-str(meta$BMI_class)
-
 #### Format OTU table ####
 # save everything except first column (OTU ID) into a matrix
 otu_mat <- as.matrix(otu[,-1])
-# Make first column (#OTU ID) the rownames of the new matrix
+# make first column (#OTU ID) the rownames of the new matrix
 rownames(otu_mat) <- otu$`#OTU ID`
-# Use the "otu_table" function to make an OTU table
+# use the "otu_table" function to make an OTU table
 OTU <- otu_table(otu_mat, taxa_are_rows = TRUE) 
 
+
 #### Format sample metadata ####
-# Save everything except sampleid as new data frame
-samp_df <- as.data.frame(meta_select[,-1]) #%>% drop_na(systolic_bp)
-# Make sampleids the rownames
+# save everything except sampleid as new data frame
+samp_df <- as.data.frame(meta_select[,-1])
+# make sampleids the rownames
 colnames(meta)
 rownames(samp_df)<- meta_select$`#SampleID`
-# Make phyloseq sample data with sample_data() function
+# make phyloseq sample data with sample_data() function
 SAMP <- sample_data(samp_df)
 
 #### Formatting taxonomy ####
-# Convert taxon strings to a table with separate taxa rank columns
+# convert taxon strings to a table with separate taxa rank columns
 colnames(tax)
 tax_mat <- tax |>
   separate(col=Taxon, sep="; "
            , into = c("Domain", "Phylum", "Class", 
                       "Order", "Family", "Genus", "Species")) |>
   as.matrix() # Saving as a matrix
-#save everything except feature IDS
+# save everything except feature IDS
 tax_mat <- tax_mat[,-1]
-# Make sampleids the rownames
+# make sampleids the rownames
 rownames(tax_mat) <- tax$`Feature ID`
-# Make taxa table
+# make taxa table
 TAX <- tax_table(tax_mat)
 
 #### Create phyloseq object ####
-# Merge all into a phyloseq object
+# merge all into a phyloseq object
 COLOMBIA <- phyloseq(OTU, SAMP, TAX, phylotree)
+
+# view components of phyloseq object with the following commands
+otu_table(COLOMBIA)
+sample_data(COLOMBIA)
+tax_table(COLOMBIA)
+phy_tree(COLOMBIA)
 
 # removing mitochondria and chloroplasts
 COLOMBIA_filt <- subset_taxa(COLOMBIA, Domain == "d__Bacteria" 
                              & Class!="c__Chloroplast" & Family!="f__Mitochondria")
 
+# removing NA's from systolic bp entry
+COLOMBIA_final <- subset_samples(COLOMBIA_filt, !is.na(systolic_bp) )
+
 
 ######## Setting up richness loop ########
 # Calculate richness metric
-estrich <- estimate_richness(COLOMBIA_filt)
+estrich <- estimate_richness(COLOMBIA_final)
 # Extract sample data
-sampdata <- data.frame(sample_data(COLOMBIA_filt))
+sampdata <- data.frame(sample_data(COLOMBIA_final))
 
 ######## Alpha diversity loop to test each individual predictor ###########
-# To run linear models for each predictor, 
-# you can loop through each column.
 
-# Make vector of column names
+# make vector of column names
 allPredictors <- colnames(sampdata)
-# Make a vector that is just shannon
+# make a vector that is just shannon
 shannon_vec <- estrich$Shannon
 
-# For each loop, you are going to run a linear model.
-# You need somewhere to save the output, so we are going to make a 'list', 
-# which we will populate with the results
+# alpha diversity loop
 resultsListalpha <- list()
 for ( x in allPredictors ) {
-  # Make linear model
-  # Here, the response variable stays the same every time. It is the shannon diversity vector.
-  # Then, the function get() asks lm() to treat 'x' as a variable rather than as 'x' itself. 
-  # Using get() allows you to 'get' the vaues stored WITHIN x
+  # making linear model
   model <- lm(shannon_vec ~ get(x), data = sampdata)
-  # Save the model summary
+  # saving the model summary
   modelsummary <- summary(model)
-  # Finally, we are going to save the modelsummary in our list
-  # We want to name each list item with the variable 'x', so we do this:
+  # saving the modelsummary in our list
   resultsListalpha[[x]] <- modelsummary
   
 }
 
-# Now, if we call our list, "resultsList", it will return ALL model summary results
+# calling the list
 resultsListalpha
 
-# We can save this as a text file for easier reading
-# Because a "list" is not a table (and therefore not easy to "write" for a computer)
-# we are going to use a function called sink() to "capture" the output of resultsList and save it. Like this:
-#create new folder for alphadiversity
+
+# create new folder for alpha diversity if you want
 dir.create("AlphaDiversity")
-sink(file="resultsList_shannon_all_predictors.txt") # Opens file up to save
+setwd("AlphaDiversity")
+
+# open file to save
+sink(file="resultsListalpha_shannon_all_predictors.txt") 
 resultsListalpha # Captures this output
 sink() # closes the file and saves it)
 
 
-#Loop for alpha diversity plots
+# loop for alpha diversity plots
+richness_plots <- list()
 
 for (x in allPredictors) {
-  plot_richness(COLOMBIA_filt, x = x, measures = c("Shannon")) +
-    geom_boxplot()
+  richness_plots[[x]] <- plot_richness(COLOMBIA_final, x = x, measures = c("Shannon")) +
+    geom_boxplot() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1))
+  
 }
 
+richness_plots
 
-#    geom_boxplot() +
-#    ggsave(filename = paste0("Module13/plot_richness_",x,".png")
-#           , height=4, width=6)
+# save all plot objects using ggsave
+for (i in seq_along(allPredictors)) {
+  ggsave(filename = paste0("plot_richness_", allPredictors[i], ".png"), 
+         plot = richness_plots[[i]], 
+         height = 4, width = 6)
+ 
+}
+
+# go back to parent directory if a new directory was made
+setwd("..")
+
 
 #### Beta diversity #####
-# reminders:
-# for beta diversity, the response variable will be your distance matrix
-# You will need to create the distance matrix with your phyloseq object like this:
-dm <- distance(otu_table(COLOMBIA_filt), method="bray")
-# The distance matrix will be the same for all tests done by the loop, so this 
-# should go on the outside of the loop
 
-# Then, you will use adonis2() (from the vegan package) instead of lm() 
-permanova_results <- adonis2(dm ~ BMI, data = sampdata, permutations = 10000) 
-permanova_results
-# You will want to save these outputs, just as you saved alpha diversity
-# Note: I suggest increasing your "permutations" to 10,000 to allow for lower p-values.
-# The default permutation size is 1000, which only allows for pvalues of 0.001 or more (because, by definition, your sample can only be compared to 1000 permutations (1/1000))
-# The run time is slightly longer, but your results will be easier to interpret. 
+# object for distance matrix
+dm <- distance(otu_table(COLOMBIA_final), method="bray")
 
-
+# beta diversity loop
 resultsListbeta <- list()
+
 for ( x in allPredictors ) {
-  # Make linear model
-  # Here, the response variable stays the same every time. It is the shannon diversity vector.
-  # Then, the function get() asks lm() to treat 'x' as a variable rather than as 'x' itself. 
-  # Using get() allows you to 'get' the vaues stored WITHIN x
-  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 100)
-  # Save the model summary
+  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 10000)
+  # saving the summary
   permanova_summary <- summary(permanova_results)
-  # Finally, we are going to save the modelsummary in our list
-  # We want to name each list item with the variable 'x', so we do this:
+  # saving the modelsummary to the list
   resultsListbeta[[x]] <- permanova_summary
   
 }
 resultsListbeta 
+
+#create new folder for beta diversity
+dir.create("BetaDiversity")
+setwd("BetaDiversity")
+
+# open file to save
+sink(file="resultsListbeta_bray_all_predictors.txt") 
+resultsListbeta # Captures this output
+sink() # closes the file and saves it)
