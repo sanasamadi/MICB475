@@ -72,6 +72,9 @@ estrich <- estimate_richness(COLOMBIA_final)
 sampdata <- data.frame(sample_data(COLOMBIA_final))
 
 ######## Alpha diversity loop to test each individual predictor ###########
+# create new folder for alpha diversity if you want
+dir.create("AlphaDiversity")
+setwd("AlphaDiversity")
 
 # make vector of column names
 allPredictors <- colnames(sampdata)
@@ -79,7 +82,11 @@ allPredictors <- colnames(sampdata)
 shannon_vec <- estrich$Shannon
 
 # alpha diversity loop
+
+# loop for all statistical values from shannon
+# making a list
 resultsListalpha <- list()
+
 for ( x in allPredictors ) {
   # making linear model
   model <- lm(shannon_vec ~ get(x), data = sampdata)
@@ -93,16 +100,43 @@ for ( x in allPredictors ) {
 # calling the list
 resultsListalpha
 
-
-# create new folder for alpha diversity if you want
-dir.create("AlphaDiversity")
-setwd("AlphaDiversity")
-
-# open file to save
+# open to save as txt file
 sink(file="resultsListalpha_shannon_all_predictors.txt") 
 resultsListalpha # Captures this output
 sink() # closes the file and saves it)
 
+# loop for formatting statistical values into a table
+# make a data frame
+results_table_alpha <- data.frame()
+
+for ( x in allPredictors ) {
+  # making linear model
+  model <- lm(shannon_vec ~ get(x), data = sampdata)
+  #inserting values in data frame
+  new_results <- summary(model)$coefficients |>
+    as.data.frame() |> 
+    rownames_to_column(var="CoefficientName") |> # this makes the rownames a column
+    mutate(predictor = x) # This tells you which predictor you are using
+  results_table_alpha <- rbind(results_table_alpha, new_results)
+  
+}
+
+# view data frame
+results_table_alpha
+
+# removing intercept from table 
+results_table_alpha_filt <- results_table_alpha |>
+  filter(CoefficientName != "(Intercept)") |> # filters out intercept coefficient
+  rowwise() |> 
+  mutate(CoefficientName = gsub("get(x)", predictor, CoefficientName, fixed=TRUE)) |> 
+  ungroup() 
+
+# view table
+results_table_alpha_filt
+
+# open file to save as txt format
+write.table(results_table_alpha_filt, file="results_table_alpha.txt", 
+            quote = FALSE, sep="\t", row.names = FALSE)
 
 # loop for alpha diversity plots
 richness_plots <- list()
@@ -116,10 +150,10 @@ for (x in allPredictors) {
 
 richness_plots
 
-# save all plot objects using ggsave
-for (i in seq_along(allPredictors)) {
-  ggsave(filename = paste0("plot_richness_", allPredictors[i], ".png"), 
-         plot = richness_plots[[i]], 
+# save all plot objects 
+for (x in seq_along(allPredictors)) {
+  ggsave(filename = paste0("plot_richness_", allPredictors[x], ".png"), 
+         plot = richness_plots[[x]], 
          height = 4, width = 6)
  
 }
@@ -129,11 +163,17 @@ setwd("..")
 
 
 #### Beta diversity #####
+#create new folder for beta diversity
+dir.create("BetaDiversity")
+setwd("BetaDiversity")
 
 # object for distance matrix
 dm <- distance(otu_table(COLOMBIA_final), method="bray")
 
 # beta diversity loop
+
+# loop for all statistical values
+# make a list to call later on
 resultsListbeta <- list()
 
 for ( x in allPredictors ) {
@@ -144,13 +184,68 @@ for ( x in allPredictors ) {
   resultsListbeta[[x]] <- permanova_summary
   
 }
-resultsListbeta 
 
-#create new folder for beta diversity
-dir.create("BetaDiversity")
-setwd("BetaDiversity")
+resultsListbeta 
 
 # open file to save
 sink(file="resultsListbeta_bray_all_predictors.txt") 
 resultsListbeta # Captures this output
 sink() # closes the file and saves it)
+
+# loop for formatting statistical values into a table
+results_table_beta <- data.frame()
+
+for ( x in allPredictors ) {
+  # making linear model
+  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 10000) 
+  #inserting values in data frame
+  new_results <- permanova_results |>
+    as.data.frame() |>
+    rownames_to_column(var="CoefficientName") |>
+    mutate(predictor = x)
+  results_table_beta <- rbind(results_table_beta, new_results)
+  
+}
+
+# view 
+results_table_beta
+
+# removing residual and total from table 
+results_table_beta_filt <- results_table_beta |>
+  subset(CoefficientName == "get(x)") |> 
+  rowwise() |> 
+  mutate(CoefficientName = gsub("get(x)", predictor, CoefficientName, fixed=TRUE)) |> 
+  ungroup() 
+
+
+# view table
+results_table_beta_filt
+
+# open file to save
+write.table(results_table_beta_filt, file="results_table_beta.txt", 
+            quote = FALSE, sep="\t", row.names = FALSE)
+
+
+#!!! loop for beta diversity plots!!!
+pcoa_dm <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm)
+
+bray_plots <- list()
+
+for (x in allPredictors) {
+  bray_plots[[x]] <- plot_ordination(COLOMBIA_final, pcoa_dm, color = x) +
+    labs(title = x)
+  
+}
+
+bray_plots
+
+# save all plot objects 
+for (x in seq_along(allPredictors)) {
+  ggsave(filename = paste0("plot_pcoa_", allPredictors[x], ".png"), 
+         plot = bray_plots[[x]], 
+         height = 4, width = 6)
+  
+}
+
+# go back to parent directory if a new directory was made
+setwd("..")
