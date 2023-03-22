@@ -1,12 +1,43 @@
-library(phyloseq)
-library(tidyverse)
-library(vegan)
+# load packages
+req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
+lapply(req_packages, library, character.only = TRUE)
 
 #Sourcing code from the other file
 source("AIC_for_adonis2.R")
 
 #Loading phyloseq object - do we download it as a seperate file first or can we skip this step if it's already in the environment?
-load("COLOMBIA_final.RData")
+load("COLOMBIA_final.R")
+
+# load packages
+req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
+lapply(req_packages, library, character.only = TRUE)
+
+# sourcing code from the other files
+source("AIC_for_adonis2.R")
+source("COLOMBIA_final.R")
+
+# extracting sample data from phyloseq object
+sampdata <- data.frame(sample_data(COLOMBIA_final))
+
+######## stepAIC for alpha diversity ############
+
+# calculate richness metric
+estrich <- estimate_richness(COLOMBIA_final)
+
+# make a vector that is just shannon
+shannon_vec <- estrich$Shannon
+
+# make a model with ALL predictors
+model_full <- lm(shannon_vec ~ ., data = sampdata)
+# using stepAIC from the MASS package:
+stepaic_results <- stepAIC(model_full)
+stepaic_results # this is the best fit model
+
+# comparing AIC values:
+AIC(stepaic_results) # best fit model AIC
+AIC(model_full) # full model (all predictors)
+
+######## stepAIC for PERMANOVA ##########
 
 #Rename phyloseq object
 phyloseqObject <- COLOMBIA_final
