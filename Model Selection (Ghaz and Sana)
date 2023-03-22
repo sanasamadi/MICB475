@@ -1,1 +1,44 @@
+library(phyloseq)
+library(tidyverse)
+library(vegan)
 
+#Sourcing code from the other file
+source("AIC_for_adonis2.R")
+
+#Loading phyloseq object - do we download it as a seperate file first or can we skip this step if it's already in the environment?
+load("COLOMBIA_final.RData")
+
+#Rename phyloseq object
+phyloseqObject <- COLOMBIA_final
+
+#Extracting sample data of interest
+sampdat <- data.frame(sample_data(phyloseqObject))
+
+#Filtering out NAs in the dataset
+sampdat_filt <- sampdat %>% select(adiponectin
+                                    , age_years
+                                    , age_range
+                                    , BMI
+                                    , BMI_class
+                                    , Body_Fat_Percentage
+                                    , Calorie_intake
+                                    , Cardiometabolic_status
+                                    , city
+                                    , country
+                                    , diastolic_bp
+                                    , fiber
+                                    , glucose
+                                    , Hemoglobin_a1c
+                                    , CRP
+                                    , insulin
+                                    , latitude
+                                    , Total_Cholesterol
+                                    , HDL
+                                    , LDL
+                                    , VLDL
+                                    , Triglycerides
+                                    , medication
+                                    , 
+                                  
+) %>%
+  drop_na()
