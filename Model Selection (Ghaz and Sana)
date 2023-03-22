@@ -38,7 +38,18 @@ sampdat_filt <- sampdat %>% select(adiponectin
                                     , VLDL
                                     , Triglycerides
                                     , medication
-                                    , 
-                                  
+                                    , per_carbohydrates
+                                    , per_total_protein
+                                    , per_total_fat
+                                    , per_animal_protein
+                                    , per_monoinsaturated_fat
+                                    , per_polyunsaturated_fat
+                                    , per_saturated_fat
+                                    , sex
+                                    , smoker
+                                    , stool_consistency
+                                    , systolic_bp
+                                    , MET_mins_per_week
+                                    , waist_circumference                        
 ) %>%
   drop_na()
