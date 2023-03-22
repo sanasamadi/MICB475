@@ -167,6 +167,9 @@ setwd("..")
 dir.create("BetaDiversity")
 setwd("BetaDiversity")
 
+# for reproducible results
+set.seed(10001)
+
 # object for distance matrix
 dm <- distance(otu_table(COLOMBIA_final), method="bray")
 
