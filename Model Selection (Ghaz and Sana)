@@ -52,4 +52,48 @@ sampdat_filt <- sampdat %>% select(adiponectin
                                     , MET_mins_per_week
                                     , waist_circumference                        
 ) %>%
-  drop_na()
+  drop_na(COLOMBIA_final,)
+  
+  #filtering phyloseq object to remove dropped samples
+  phyloseqObject_filt <- prune_samples(rownames(sampdat_filt), phyloseqObject)
+  
+  #Create a matrix with all the combinations of predictors
+  combinations <- expand.grid(rep(list(c(FALSE,TRUE)),ncol(sampdat_filt)))
+  combinations <- combinations[-1,]
+  
+  #Create distance matrix response variable
+  dm <- distance(phyloseqObject_filt, method="bray")
+  
+# Define an empty vector to store the AIC values
+aic_results <- vector(length=nrow(combinations))
+
+#Start of loop
+for (r in 1:nrow(combinations)) {
+  
+  # Extract the predictors
+  toinclude <- unlist(combinations[r,])
+  
+  # Select columns from the sample data using the extracted predictors
+  newSampDat <- data.frame(sampdat_filt[,toinclude])
+  
+  # Calculate the distance matrix
+  newdm <- distance(phyloseqObject_filt, method="bray", weighted = TRUE, check = TRUE, k = NULL, robust = FALSE, do.upper = TRUE, diag = TRUE)
+  
+  # Run PERMANOVA on the selected predictors
+  permanova_results <- adonis2(newdm ~ ., data=newSampDat, permutations = 10000)
+  
+  # Calculate AIC value using the custom source codes
+  aic <- AICc.PERMANOVA2(permanova_results)
+  
+  # Save the AIC value into the vector
+  aic_results[r] <- aic$AIC
+}
+
+# Identify the row with the minimum AIC value
+minRow <- which.min(aic_results)
+
+# Extract the predictors for the best model
+bestCombo <- unlist(combinations[minRow,])
+
+  #Obtain list of variable of the "best" model
+  colnames(data.frame(sampdat_filt[,bestCombo]))
