@@ -2,7 +2,7 @@
 set.seed(10001)
 
 # load packages
-req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
+req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan", "RColorBrewer", "cowplot")
 lapply(req_packages, library, character.only = TRUE)
 
 # extracting code for phyloseq object
@@ -65,7 +65,7 @@ results_table_alpha_filt
 write.table(results_table_alpha_filt, file="results_table_alpha.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
 
-# loop for alpha diversity plots
+#### loop for alpha diversity plots ####
 richness_plots <- list()
 
 for (x in allPredictors) {
@@ -83,6 +83,42 @@ for (x in seq_along(allPredictors)) {
          height = 4, width = 6)
  
 }
+
+#### plot for adiponectin ####
+dir.create("Aim 1 Figures")
+setwd("Aim 1 Figures")
+display.brewer.all(colorblindFriendly = T)
+
+adiponectin_plot <- plot_richness(COLOMBIA_final, x = "adiponectin", measures = c("Shannon"), color = "adiponectin") +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15)) +
+  labs(x = "Adiponectin levels (µg/ml)", color = "Adiponectin", title = "Q2: Add title?")
+adiponectin_plot + scale_fill_brewer (palette = "Set2")
+
+#### plot for city ####
+city_plot <- plot_richness(COLOMBIA_final, x = "city", measures = c("Shannon"), color = "city") +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15)) +
+  geom_boxplot(alpha = 0.5) +
+  labs(x = "City", title = "Plot in reference to Question 1") 
+city_plot + scale_fill_brewer (palette = "Set2")
+
+ggsave(filename = paste0("Question_1_city_plot.png"), 
+       plot = city_plot, 
+       height = 4, width = 6)
+
+#### pot for animal protein ####
+animalprotein_plot <- plot_richness(COLOMBIA_final, x = "per_animal_protein", measures = c("Shannon"), color = "adiponectin") +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15)) +
+  labs(x = "Animal Protein (%)", color = "Animal Protein", title = "Q2: Add title?")
+animalprotein_plot + scale_fill_brewer (palette = "Set2")
+
+alpha_sig_plots <- plot_grid(adiponectin_plot, city_plot, animalprotein_plot, ncol = 3)
+alpha_sig_plots
 
 # go back to parent directory if a new directory was made
 setwd("..")
@@ -106,11 +142,16 @@ results_table_bray <- data.frame()
 for ( x in allPredictors ) {
   # making linear model
   permanova_results <- adonis2(dm_bray ~ get(x), data = sampdata, permutations = 10000) 
+  
+  # adjusting p values
+  adjusted_pvalues <- p.adjust(permanova_results$`Pr(>F)`, method = "BH")
+  permanova_results$`Pr(>F)` <- adjusted_pvalues
+  
   #inserting values in data frame
   new_results <- permanova_results |>
     as.data.frame() |>
     rownames_to_column(var="CoefficientName") |>
-    mutate(predictor = x)
+    mutate(predictor = x, adjusted_pvalues)
   results_table_bray <- rbind(results_table_bray, new_results)
   
 }
@@ -146,11 +187,15 @@ for ( x in allPredictors ) {
   # making linear model
   permanova_results <- adonis2(dm_unifrac ~ get(x), data = sampdata, permutations = 10000)
   
+  # adjusting p values
+  adjusted_pvalues <- p.adjust(permanova_results$`Pr(>F)`, method = "BH")
+  permanova_results$`Pr(>F)` <- adjusted_pvalues
+  
   #inserting values in data frame
   new_results <- permanova_results |>
     as.data.frame() |>
     rownames_to_column(var="CoefficientName") |>
-    mutate(predictor = x)
+    mutate(predictor = x, adjusted_pvalues)
   results_table_unifrac <- rbind(results_table_unifrac, new_results)
   
 }
@@ -170,7 +215,7 @@ results_table_unifrac_filt <- results_table_unifrac |>
 results_table_unifrac_filt
 
 # open file to save
-write.table(results_table_bray_filt, file="results_table_unifrac.txt", 
+write.table(results_table_unifrac_filt, file="results_table_unifrac.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
 
 #!!! loop for beta diversity plots!!!
@@ -219,3 +264,4 @@ for (x in seq_along(allPredictors)) {
 
 # go back to parent directory if a new directory was made
 setwd("..")
+
