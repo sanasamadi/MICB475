@@ -1,75 +1,19 @@
+# setting seed for repeatable data
+set.seed(10001)
+
 # load packages
 req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
 lapply(req_packages, library, character.only = TRUE)
 
-# load data
-otu <- read_tsv("feature-table.txt", skip = 1)
-meta <- read_tsv("colombia_metadata.txt")
-tax <- read_tsv("taxonomy.tsv")
-phylotree <- read.tree("tree.nwk")
+# extracting code for phyloseq object
+source("COLOMBIA_final.R")
 
-# removing redundant columns
-select <- dplyr::select
-meta_select <- meta |>
-  select(-c(age_range, country))
-colnames(meta_select)
-
-#### Format OTU table ####
-# save everything except first column (OTU ID) into a matrix
-otu_mat <- as.matrix(otu[,-1])
-# make first column (#OTU ID) the rownames of the new matrix
-rownames(otu_mat) <- otu$`#OTU ID`
-# use the "otu_table" function to make an OTU table
-OTU <- otu_table(otu_mat, taxa_are_rows = TRUE) 
-
-
-#### Format sample metadata ####
-# save everything except sampleid as new data frame
-samp_df <- as.data.frame(meta_select[,-1])
-# make sampleids the rownames
-colnames(meta)
-rownames(samp_df)<- meta_select$`#SampleID`
-# make phyloseq sample data with sample_data() function
-SAMP <- sample_data(samp_df)
-
-#### Formatting taxonomy ####
-# convert taxon strings to a table with separate taxa rank columns
-colnames(tax)
-tax_mat <- tax |>
-  separate(col=Taxon, sep="; "
-           , into = c("Domain", "Phylum", "Class", 
-                      "Order", "Family", "Genus", "Species")) |>
-  as.matrix() # Saving as a matrix
-# save everything except feature IDS
-tax_mat <- tax_mat[,-1]
-# make sampleids the rownames
-rownames(tax_mat) <- tax$`Feature ID`
-# make taxa table
-TAX <- tax_table(tax_mat)
-
-#### Create phyloseq object ####
-# merge all into a phyloseq object
-COLOMBIA <- phyloseq(OTU, SAMP, TAX, phylotree)
-
-# view components of phyloseq object with the following commands
-otu_table(COLOMBIA)
-sample_data(COLOMBIA)
-tax_table(COLOMBIA)
-phy_tree(COLOMBIA)
-
-# removing mitochondria and chloroplasts
-COLOMBIA_filt <- subset_taxa(COLOMBIA, Domain == "d__Bacteria" 
-                             & Class!="c__Chloroplast" & Family!="f__Mitochondria")
-
-# removing NA's from systolic bp entry
-COLOMBIA_final <- subset_samples(COLOMBIA_filt, !is.na(systolic_bp) )
-
+###### Extracting sample data ########
+sampdata <- data.frame(sample_data(COLOMBIA_final))
 
 ######## Setting up richness loop ########
-# Calculate richness metric
+# calculate richness metric
 estrich <- estimate_richness(COLOMBIA_final)
-# Extract sample data
-sampdata <- data.frame(sample_data(COLOMBIA_final))
 
 ######## Alpha diversity loop to test each individual predictor ###########
 # create new folder for alpha diversity if you want
@@ -81,42 +25,24 @@ allPredictors <- colnames(sampdata)
 # make a vector that is just shannon
 shannon_vec <- estrich$Shannon
 
-# alpha diversity loop
+##### alpha diversity loop ######
 
-# loop for all statistical values from shannon
-# making a list
-resultsListalpha <- list()
-
-for ( x in allPredictors ) {
-  # making linear model
-  model <- lm(shannon_vec ~ get(x), data = sampdata)
-  # saving the model summary
-  modelsummary <- summary(model)
-  # saving the modelsummary in our list
-  resultsListalpha[[x]] <- modelsummary
-  
-}
-
-# calling the list
-resultsListalpha
-
-# open to save as txt file
-sink(file="resultsListalpha_shannon_all_predictors.txt") 
-resultsListalpha # Captures this output
-sink() # closes the file and saves it)
-
-# loop for formatting statistical values into a table
 # make a data frame
 results_table_alpha <- data.frame()
 
 for ( x in allPredictors ) {
   # making linear model
   model <- lm(shannon_vec ~ get(x), data = sampdata)
+  
+  # adjusting p values
+  pvalues <- summary(model)$coefficients[,4]
+  adjusted_pvalues <- p.adjust(pvalues, method = "BH")
+  
   #inserting values in data frame
   new_results <- summary(model)$coefficients |>
     as.data.frame() |> 
     rownames_to_column(var="CoefficientName") |> # this makes the rownames a column
-    mutate(predictor = x) # This tells you which predictor you are using
+    mutate(predictor = x, adjusted_pvalues) # this tells you which predictor you are using
   results_table_alpha <- rbind(results_table_alpha, new_results)
   
 }
@@ -134,6 +60,7 @@ results_table_alpha_filt <- results_table_alpha |>
 # view table
 results_table_alpha_filt
 
+
 # open file to save as txt format
 write.table(results_table_alpha_filt, file="results_table_alpha.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
@@ -143,8 +70,7 @@ richness_plots <- list()
 
 for (x in allPredictors) {
   richness_plots[[x]] <- plot_richness(COLOMBIA_final, x = x, measures = c("Shannon")) +
-    geom_boxplot() +
-    theme(axis.text.x = element_text(angle = 0, hjust = 1))
+    theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5))
   
 }
 
@@ -167,54 +93,73 @@ setwd("..")
 dir.create("BetaDiversity")
 setwd("BetaDiversity")
 
-# for reproducible results
-set.seed(10001)
+####### beta diversity loop ########
 
+#### PERMANOVA using bray metric ####
 # object for distance matrix
-dm <- distance(otu_table(COLOMBIA_final), method="bray")
+dm_bray <- distance(otu_table(COLOMBIA_final), method = "bray")
 
-# beta diversity loop
+# creating data frame to store values
+results_table_bray <- data.frame()
 
-# loop for all statistical values
-# make a list to call later on
-resultsListbeta <- list()
-
-for ( x in allPredictors ) {
-  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 10000)
-  # saving the summary
-  permanova_summary <- summary(permanova_results)
-  # saving the modelsummary to the list
-  resultsListbeta[[x]] <- permanova_summary
-  
-}
-
-resultsListbeta 
-
-# open file to save
-sink(file="resultsListbeta_bray_all_predictors.txt") 
-resultsListbeta # Captures this output
-sink() # closes the file and saves it)
-
-# loop for formatting statistical values into a table
-results_table_beta <- data.frame()
-
+# loop
 for ( x in allPredictors ) {
   # making linear model
-  permanova_results <- adonis2(dm ~ get(x), data = sampdata, permutations = 10000) 
+  permanova_results <- adonis2(dm_bray ~ get(x), data = sampdata, permutations = 10000) 
   #inserting values in data frame
   new_results <- permanova_results |>
     as.data.frame() |>
     rownames_to_column(var="CoefficientName") |>
     mutate(predictor = x)
-  results_table_beta <- rbind(results_table_beta, new_results)
+  results_table_bray <- rbind(results_table_bray, new_results)
   
 }
 
 # view 
-results_table_beta
+results_table_bray
 
 # removing residual and total from table 
-results_table_beta_filt <- results_table_beta |>
+results_table_bray_filt <- results_table_bray |>
+  subset(CoefficientName == "get(x)") |> # keeping only predictors
+  rowwise() |> 
+  mutate(CoefficientName = gsub("get(x)", predictor, CoefficientName, fixed=TRUE)) |> 
+  ungroup() 
+
+
+# view table
+results_table_bray_filt
+
+# open file to save
+write.table(results_table_bray_filt, file="results_table_bray.txt", 
+            quote = FALSE, sep="\t", row.names = FALSE)
+
+#### PERMANOVA using unweighted unifrac metric ####
+# object for distance matrix
+dm_unifrac <- UniFrac(COLOMBIA_final, weighted = FALSE)
+
+# creating data frame to store values
+results_table_unifrac <- data.frame()
+
+### loop ###
+for ( x in allPredictors ) {
+  
+  # making linear model
+  permanova_results <- adonis2(dm_unifrac ~ get(x), data = sampdata, permutations = 10000)
+  
+  #inserting values in data frame
+  new_results <- permanova_results |>
+    as.data.frame() |>
+    rownames_to_column(var="CoefficientName") |>
+    mutate(predictor = x)
+  results_table_unifrac <- rbind(results_table_unifrac, new_results)
+  
+}
+
+# view 
+results_table_unifrac
+
+# removing residual and total from table 
+results_table_unifrac_filt <- results_table_unifrac |>
   subset(CoefficientName == "get(x)") |> 
   rowwise() |> 
   mutate(CoefficientName = gsub("get(x)", predictor, CoefficientName, fixed=TRUE)) |> 
@@ -222,20 +167,21 @@ results_table_beta_filt <- results_table_beta |>
 
 
 # view table
-results_table_beta_filt
+results_table_unifrac_filt
 
 # open file to save
-write.table(results_table_beta_filt, file="results_table_beta.txt", 
+write.table(results_table_bray_filt, file="results_table_unifrac.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
 
-
 #!!! loop for beta diversity plots!!!
-pcoa_dm <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm)
+
+##### bray plots #####
+pcoa_dm_bray <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm_bray)
 
 bray_plots <- list()
 
 for (x in allPredictors) {
-  bray_plots[[x]] <- plot_ordination(COLOMBIA_final, pcoa_dm, color = x) +
+  bray_plots[[x]] <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = x) +
     labs(title = x)
   
 }
@@ -244,8 +190,29 @@ bray_plots
 
 # save all plot objects 
 for (x in seq_along(allPredictors)) {
-  ggsave(filename = paste0("plot_pcoa_", allPredictors[x], ".png"), 
+  ggsave(filename = paste0("plot_pcoa_bray_", allPredictors[x], ".png"), 
          plot = bray_plots[[x]], 
+         height = 4, width = 6)
+  
+}
+
+##### unifrac plots #####
+pcoa_dm_unifrac <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm_unifrac)
+
+unifrac_plots <- list()
+
+for (x in allPredictors) {
+  unifrac_plots[[x]] <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = x) +
+    labs(title = x)
+  
+}
+
+unifrac_plots
+
+# save all plot objects 
+for (x in seq_along(allPredictors)) {
+  ggsave(filename = paste0("plot_pcoa_unifrac_", allPredictors[x], ".png"), 
+         plot = unifrac_plots[[x]], 
          height = 4, width = 6)
   
 }
