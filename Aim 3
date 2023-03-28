@@ -47,6 +47,22 @@ data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
 # Compute the Bray-Curtis dissimilarity matrix using vegan package
 bc_dissimilarity <- vegdist(data_matrix, method = "bray")
 
-# Visualize the dissimilarity matrix using a dendrogram
-dendrogram <- hclust(bc_dissimilarity, method = "average")
-plot(dendrogram)
+# Perform PCoA on the dissimilarity matrix
+pcoa <- cmdscale(bc_dissimilarity, eig = TRUE, k = 3)
+
+# Extract the PCoA coordinates and add sample IDs
+pcoa_df <- data.frame(pcoa$points, row.names = row.names(data_matrix))
+colnames(pcoa_df) <- c("PC1", "PC2", "PC3", "Sample_ID")
+
+# Add sample group information to the PCoA coordinates
+pcoa_df <- pcoa_df %>% 
+  mutate(Group = ifelse(BMI >= 30 | (body_fat_percentage >= 25 & sex == "male") | (body_fat_percentage >= 30 & sex == "female") | (waist_circumference >= 90 & sex == "male") | (waist_circumference >= 80 & sex == "female"), "Obese", "Non-Obese"))
+
+# Plot the PCoA
+ggplot(pcoa_df, aes(x = PC1, y = PC2, color = Group, shape = Group)) +
+  geom_point(size = 3) +
+  labs(title = "PCoA plot based on filtered participant data",
+       x = paste0("PC1 (", round(pcoa_eig[1]*100/sum(pcoa_eig), 1), "%)"),
+       y = paste0("PC2 (", round(pcoa_eig[2]*100/sum(pcoa_eig), 1), "%)"),
+       color = "Group", shape = "Group") +
+  theme_minimal()
