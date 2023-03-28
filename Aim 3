@@ -32,3 +32,21 @@ for (i in 1:nrow(Individuals)) {
 
 # Subset the data frame to include only the filtered rows
 filtered_Individuals <- Individuals[filtered_indices,]
+
+# Read in the filtered participant data (assuming it's stored in a CSV file named "filtered_participants.csv")
+filtered_participants <- read.csv("filtered_participants.csv")
+
+# Extract the columns with the relevant data (assuming the columns are named "BMI", "body_fat_percentage", and "waist_circumference")
+bmi <- filtered_participants$BMI
+body_fat_percentage <- filtered_participants$body_fat_percentage
+waist_circumference <- filtered_participants$waist_circumference
+
+# Combine the data into a matrix format
+data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
+
+# Compute the Bray-Curtis dissimilarity matrix using vegan package
+bc_dissimilarity <- vegdist(data_matrix, method = "bray")
+
+# Visualize the dissimilarity matrix using a dendrogram
+dendrogram <- hclust(bc_dissimilarity, method = "average")
+plot(dendrogram)
