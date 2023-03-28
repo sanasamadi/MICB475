@@ -8,6 +8,14 @@ meta <- read.delim("colombia_metadata.txt")
 #Filter data
 meta_filtered <- select(meta, c(BMI, waist_circumference, Body_Fat_Percentage))
 
+# Sample data for demonstration purposes
+participants <- data.frame(
+  name = c("John", "Mary", "David", "Anna"),
+  gender = c("male", "female", "male", "female"),
+  BMI = c(25, 32, 28, 31),
+  body_fat_percentage = c(23, 28, 30, 29),
+  waist_circumference = c(85, 92, 88, 78)
+)
 
 
 
