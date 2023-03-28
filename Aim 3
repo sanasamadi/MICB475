@@ -33,13 +33,10 @@ for (i in 1:nrow(Individuals)) {
 # Subset the data frame to include only the filtered rows
 filtered_Individuals <- Individuals[filtered_indices,]
 
-# Read in the filtered participant data (assuming it's stored in a CSV file named "filtered_participants.csv")
-filtered_participants <- read.csv("filtered_participants.csv")
-
 # Extract the columns with the relevant data (assuming the columns are named "BMI", "body_fat_percentage", and "waist_circumference")
-bmi <- filtered_participants$BMI
-body_fat_percentage <- filtered_participants$body_fat_percentage
-waist_circumference <- filtered_participants$waist_circumference
+bmi <- filtered_Individuals$BMI
+body_fat_percentage <- filtered_Individuals$body_fat_percentage
+waist_circumference <- filtered_Individuals$waist_circumference
 
 # Combine the data into a matrix format
 data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
