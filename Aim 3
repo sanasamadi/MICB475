@@ -1,1 +1,20 @@
+# Initialize an empty vector to store the filtered indices
+filtered_indices <- c()
 
+# Loop through each row of the data frame
+for (i in 1:nrow(participants)) {
+  row <- participants[i,]
+  
+  # Check if the row meets all three thresholds or if it's below all three thresholds
+  if ((row$BMI >= 30 & ((row$gender == "male" & row$body_fat_percentage >= 25) | 
+                        (row$gender == "female" & row$body_fat_percentage >= 30)) & 
+                        row$waist_circumference >= 90) |
+      (row$BMI < 30 & ((row$gender == "male" & row$body_fat_percentage < 25) | 
+                       (row$gender == "female" & row$body_fat_percentage < 30)) & 
+                       row$waist_circumference < 90)) {
+    filtered_indices <- c(filtered_indices, i)
+  }
+}
+
+# Subset the data frame to include only the filtered rows
+filtered_participants <- participants[filtered_indices,]
