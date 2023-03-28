@@ -39,92 +39,120 @@ AIC(model_full) # full model (all predictors)
 
 ######## stepAIC for PERMANOVA ##########
 
-#Rename phyloseq object
-phyloseqObject <- COLOMBIA_final
+library(phyloseq)
+library(tidyverse)
+library(vegan)
 
-#Extracting sample data of interest
+# Here, you need to "source" code from the file, AIC_for_adonis2.R
+# This includes custom scripts that calculate AIC for permanovas
+source("AIC_for_adonis2.R")
+
+# Let's say you have a phyloseq object called "phyloseqObject"
+# Here, I'm going to use the atacama dataset as an example. I haven't included 
+# the code here for it, so you should replace atacama_final with whatever 
+# your phyloseq object is called.
+load("COLOMBIA_final.R")
+phyloseqObject <- atacama_final
+
+## First, extract sample data of interest
 sampdat <- data.frame(sample_data(phyloseqObject))
-
-#Filtering out NAs in the dataset
+# It is important that we filter out any NAs in the dataset
 sampdat_filt <- sampdat %>% select(adiponectin
-                                    , age_years
-                                    , age_range
-                                    , BMI
-                                    , BMI_class
-                                    , Body_Fat_Percentage
-                                    , Calorie_intake
-                                    , Cardiometabolic_status
-                                    , city
-                                    , country
-                                    , diastolic_bp
-                                    , fiber
-                                    , glucose
-                                    , Hemoglobin_a1c
-                                    , CRP
-                                    , insulin
-                                    , latitude
-                                    , Total_Cholesterol
-                                    , HDL
-                                    , LDL
-                                    , VLDL
-                                    , Triglycerides
-                                    , medication
-                                    , per_carbohydrates
-                                    , per_total_protein
-                                    , per_total_fat
-                                    , per_animal_protein
-                                    , per_monoinsaturated_fat
-                                    , per_polyunsaturated_fat
-                                    , per_saturated_fat
-                                    , sex
-                                    , smoker
-                                    , stool_consistency
-                                    , systolic_bp
-                                    , MET_mins_per_week
-                                    , waist_circumference                        
+                                   , age_years
+                                   , age_range
+                                   , BMI
+                                   , BMI_class
+                                   , Body_Fat_Percentage
+                                   , Calorie_intake
+                                   , Cardiometabolic_status
+                                   , city
+                                   , country
+                                   , diastolic_bp
+                                   , fiber
+                                   , glucose
+                                   , Hemoglobin_a1c
+                                   , CRP
+                                   , insulin
+                                   , latitude
+                                   , Total_Cholesterol
+                                   , HDL
+                                   , LDL
+                                   , VLDL
+                                   , Triglycerides
+                                   , medication
+                                   , per_carbohydrates
+                                   , per_total_protein
+                                   , per_total_fat
+                                   , per_animal_protein
+                                   , per_monoinsaturated_fat
+                                   , per_polyunsaturated_fat
+                                   , per_saturated_fat
+                                   , sex
+                                   , smoker
+                                   , stool_consistency
+                                   , systolic_bp
+                                   , MET_mins_per_week
+                                   , waist_circumference
 ) %>%
-  drop_na(COLOMBIA_final,)
-  
-  #filtering phyloseq object to remove dropped samples
-  phyloseqObject_filt <- prune_samples(rownames(sampdat_filt), phyloseqObject)
-  
-  #Create a matrix with all the combinations of predictors
-  combinations <- expand.grid(rep(list(c(FALSE,TRUE)),ncol(sampdat_filt)))
-  combinations <- combinations[-1,]
-  
-  #Create distance matrix response variable
-  dm <- distance(phyloseqObject_filt, method="bray")
-  
-# Define an empty vector to store the AIC values
-aic_results <- vector(length=nrow(combinations))
+  drop_na()
 
-#Start of loop
-for (r in 1:nrow(combinations)) {
-  
-  # Extract the predictors
-  toinclude <- unlist(combinations[r,])
-  
-  # Select columns from the sample data using the extracted predictors
-  newSampDat <- data.frame(sampdat_filt[,toinclude])
-  
-  # Calculate the distance matrix
-  newdm <- distance(phyloseqObject_filt, method="bray", weighted = TRUE, check = TRUE, k = NULL, robust = FALSE, do.upper = TRUE, diag = TRUE)
-  
-  # Run PERMANOVA on the selected predictors
-  permanova_results <- adonis2(newdm ~ ., data=newSampDat, permutations = 10000)
-  
-  # Calculate AIC value using the custom source codes
-  aic <- AICc.PERMANOVA2(permanova_results)
-  
-  # Save the AIC value into the vector
-  aic_results[r] <- aic$AIC
+# We also need to filter the phyloseq object to remove those dropped samples
+phyloseqObject_filt <- prune_samples(rownames(sampdat_filt), phyloseqObject)
+
+# Our goal here is to iterate through all combinations of predictors
+# How do we do that?
+
+# Let's write a loop where in each loop, we test whether the "full" model (the one with all the predictors)
+# is better tha na model with one less predictor.
+
+# Now, let's make a distance matrix response variable. This will be the same between all models.
+dm <- distance(phyloseqObject_filt, method="bray")
+
+# make vector of variables/predictors
+allVar <- colnames(sampdat_filt)
+# This is a list of predictors we are going to change
+currentPredictorSet <- allVar
+# This is the current AIC of the full model
+frml_currentBest <- formula(paste0("dm ~", paste0(currentPredictorSet, collapse=" + ")))
+permanova_results_currentBest <- adonis2(frml_currentBest, data=sampdat_filt, permutations = 10000)
+aic_currentBest <- AICc.PERMANOVA2(permanova_results_currentBest)
+
+# Loop thorugh all variables, dropping each one to see if it should be kept or not
+for ( v in allVar ) {
+  # v="depth"
+  # make a new vector that is "potential set of predictors"
+  # That is-- the next model we are trying to test against our current model
+  # This new model formula is our "old" model formula MINUS the current variable 'v'
+  # match() returns the index (location) of where v matches currentPredictorSet
+  potentialPredictorSet <- currentPredictorSet[-match(v,currentPredictorSet)] 
+  # This if loop is to check whether the new predictor set has anything in it
+  # If potentialPredictorSet is "blank" (no predictor), then we set it to "1", which is a "null" model
+  if (length(potentialPredictorSet)==0) {
+    potentialPredictorSet <- "1"
+  }
+  # Make a model formula for new set
+  frml_new <- formula(paste0("dm ~", paste0(potentialPredictorSet, collapse=" + ")))
+  # Run PERMANOVA
+  permanova_results_new <- adonis2(frml_new, data=sampdat_filt, permutations = 10000)
+  # Use the custom sourced AICc.PERMANOVA2 function to calculate AIC value from PERMANOVA
+  aic_new <-AICc.PERMANOVA2(permanova_results_new)
+  ## Test which AIC is better; new or old? if new is better (lower), update currentPredictorSets and aic_old
+  if ( aic_currentBest$AIC < aic_new$AIC ) {
+    # If the above is true, we keep OLD models
+    print(paste0("Keeping variable ",v)) # This is not needed, but nice to have some text feedback when running a long loop
+  } else {
+    print(paste0("Dropping variable ",v)) # This is not needed, but nice to have some text feedback when running a long loop
+    # else, we update model with removed predictor
+    currentPredictorSet <- potentialPredictorSet
+    frml_currentBest <- frml_new
+    permanova_results_currentBest <- permanova_results_new
+    aic_currentBest <- aic_new
+  }
 }
+# Save these as our best forward models
+permanova_best <- permanova_results_currentBest
+aic_best <- aic_currentBest
 
-# Identify the row with the minimum AIC value
-minRow <- which.min(aic_results)
 
-# Extract the predictors for the best model
-bestCombo <- unlist(combinations[minRow,])
-
-  #Obtain list of variable of the "best" model
-  colnames(data.frame(sampdat_filt[,bestCombo]))
+# Voila!
+permanova_best
