@@ -21,12 +21,12 @@ Individuals <- meta_filtered %>%
   mutate(number_T = sum(BMI_TF, waist_TF, bodyfat_TF)) %>% 
   filter(number_T == 3 | number_T == 0)
 
-# Extract the columns with the relevant data
+# Filter the columns
 bmi <- Individuals$BMI
 body_fat_percentage <- Individuals$Body_Fat_Percentage
 waist_circumference <- Individuals$waist_circumference
 
-# Combine the data into a matrix format
+# Make matrix
 data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
 
 # Compute the Bray-Curtis dissimilarity matrix using vegan package
