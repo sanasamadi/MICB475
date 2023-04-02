@@ -48,6 +48,7 @@ meta_data2
 meta_data <- rbind(meta_data1, meta_data2)
 meta_data
 
+
 otufp <- "feature-table.txt"
 otu_table <- read_delim(file = otufp, delim="\t", skip=1)
 
@@ -102,44 +103,54 @@ load("columbia_final.RData")
 load("columbia_rare.RData")
 summary(columbia_rare)
 
-bc_dm <- distance(columbia_rare, method="bray")
+library(phyloseq)
 
-pcoa_bc <- ordinate(columbia_final, method="PCoA", distance=bc_dm)
+# Load the files
+load("columbia_rare.RData")
 
-gg_pcoa_rough <- plot_ordination(columbia_rare, pcoa_bc, color = "obese") +
-  labs(col = "Obese Status")
+# Calculate Bray-Curtis dissimilarity matrix
+bc <- vegdist(t(otu_table(columbia_rare)), method = "bray")
+
+# Perform PCoA analysis
+pcoa <- ordinate(columbia_rare, method = "PCoA", distance = bc)
+
+
+# Plot the PCoA
+gg_pcoa_rough <- plot_ordination (columbia_rare, pcoa, color = "obese", shape="sex") +
+  labs(pch="Gender", col = "Obese Status")
 gg_pcoa_rough
 
+ggsave(filename = "pcoa.png"
+       , gg_pcoa_rough
+       , height=4, width=6)
 
-# Extract the columns with the relevant data
-# Filter the columns
-bmi <- Individuals$BMI
-body_fat_percentage <- Individuals$Body_Fat_Percentage
-waist_circumference <- Individuals$waist_circumference
 
-# Combine the data into a matrix format
-# Make matrix
-data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
+columbia_core<- transform_sample_counts(columbia_final, fun=function(x) x/sum(x))
 
-# Compute the Bray-Curtis dissimilarity matrix using vegan package
-bc_dissimilarity <- vegdist(data_matrix, method = "bray")
-# Perform PCoA on the dissimilarity matrix
-pcoa <- cmdscale(bc_dissimilarity, eig = TRUE, k = 3)
-# Extract the PCoA coordinates and add sample IDs
-pcoa_df <- data.frame(pcoa$points, row.names = row.names(data_matrix))
-colnames(pcoa_df) <- c("PC1", "PC2", "PC3", "Sample_ID")
-# Add sample group information to the PCoA coordinates
-pcoa_df <- pcoa_df %>% 
-  mutate(Group = ifelse(BMI >= 30 | (Body_Fat_Percentage >= 25 & gender == "male") | 
-                        (Body_Fat_Percentage >= 30 & gender == "female") | 
-                        (waist_circumference >= waist_circumference_threshold & gender == "male") | 
-                        (waist_circumference >= waist_circumference_threshold & gender == "female"), 
-                        "Obese", "Non-Obese"))
-# Plot the PCoA
-ggplot(pcoa_df, aes(x = PC1, y = PC2, color = Group, shape = Group)) +
-  geom_point(size = 3) +
-  labs(title = "PCoA plot based on filtered participant data",
-       x = paste0("PC1 (", round(pcoa_eig[1]*100/sum(pcoa_eig), 1), "%)"),
-       y = paste0("PC2 (", round(pcoa_eig[2]*100/sum(pcoa_eig), 1), "%)"),
-       color = "Group", shape = "Group") +
-  theme_minimal()
+
+columbia_core1 <- subset_samples(columbia_core, obese=="yes")
+columbia_core2 <- subset_samples(columbia_core, obese=="no")
+columbia_core3 <- core_members(columbia_core1, detection=0.001, prevalence = 0.10)
+columbia_core4 <- core_members(columbia_core2, detection=0.001, prevalence = 0.10)
+
+venndiagram <- ggVennDiagram(x=list( Obese = columbia_core3, Non_obese = columbia_core4), 
+                                    filename = "Project2/venndiagram.png", output=TRUE) +
+  labs(fill="Count") +
+  scale_fill_distiller (palette = "RdBu")
+venndiagram
+ggsave(filename = "venndiagram.png"
+       , venndiagram
+       , height=4, width=6)
+
+columbia_genus <- tax_glom(columbia_final, "Genus", NArm = FALSE)
+columbia_genus_RA <- transform_sample_counts(columbia_genus, fun=function(x) x/sum(x))
+
+isa_columbia <- multipatt(t(otu_table(columbia_genus_RA)), cluster = sample_data(columbia_genus_RA)$obese)
+summary(isa_columbia)
+taxtable <- tax_table(columbia_final) %>% as.data.frame() %>% rownames_to_column(var="ASV")
+
+isa_columbia$sign %>%
+  rownames_to_column(var="ASV") %>%
+  left_join(taxtable) %>%
+  filter(p.value<0.05) %>% 
+  View()
