@@ -109,3 +109,37 @@ pcoa_bc <- ordinate(columbia_final, method="PCoA", distance=bc_dm)
 gg_pcoa_rough <- plot_ordination(columbia_rare, pcoa_bc, color = "obese") +
   labs(col = "Obese Status")
 gg_pcoa_rough
+
+
+# Extract the columns with the relevant data
+# Filter the columns
+bmi <- Individuals$BMI
+body_fat_percentage <- Individuals$Body_Fat_Percentage
+waist_circumference <- Individuals$waist_circumference
+
+# Combine the data into a matrix format
+# Make matrix
+data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
+
+# Compute the Bray-Curtis dissimilarity matrix using vegan package
+bc_dissimilarity <- vegdist(data_matrix, method = "bray")
+# Perform PCoA on the dissimilarity matrix
+pcoa <- cmdscale(bc_dissimilarity, eig = TRUE, k = 3)
+# Extract the PCoA coordinates and add sample IDs
+pcoa_df <- data.frame(pcoa$points, row.names = row.names(data_matrix))
+colnames(pcoa_df) <- c("PC1", "PC2", "PC3", "Sample_ID")
+# Add sample group information to the PCoA coordinates
+pcoa_df <- pcoa_df %>% 
+  mutate(Group = ifelse(BMI >= 30 | (Body_Fat_Percentage >= 25 & gender == "male") | 
+                        (Body_Fat_Percentage >= 30 & gender == "female") | 
+                        (waist_circumference >= waist_circumference_threshold & gender == "male") | 
+                        (waist_circumference >= waist_circumference_threshold & gender == "female"), 
+                        "Obese", "Non-Obese"))
+# Plot the PCoA
+ggplot(pcoa_df, aes(x = PC1, y = PC2, color = Group, shape = Group)) +
+  geom_point(size = 3) +
+  labs(title = "PCoA plot based on filtered participant data",
+       x = paste0("PC1 (", round(pcoa_eig[1]*100/sum(pcoa_eig), 1), "%)"),
+       y = paste0("PC2 (", round(pcoa_eig[2]*100/sum(pcoa_eig), 1), "%)"),
+       color = "Group", shape = "Group") +
+  theme_minimal()
