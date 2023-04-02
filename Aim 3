@@ -1,57 +1,111 @@
 library(phyloseq)
 library(ape)
 library(tidyverse)
+library(vegan)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+library(DESeq2)
+library(ggVennDiagram)
+library(microbiome)
+library(indicspecies)
 
-# Load data
-meta <- read.delim("colombia_metadata.txt")
 
-# Filter data
-meta_filtered <- select(meta, c(BMI, waist_circumference, Body_Fat_Percentage, gender))
 
-# Create a new variable for waist circumference threshold based on gender
-meta_filtered <- meta_filtered %>% 
-  mutate(waist_circumference_threshold = ifelse(gender == "male", 90, 80))
+# Read in metadata
+meta_23 <- "colombia_metadata.txt"
+meta <- read_delim (meta_23, delim="\t") 
 
-# Filter the data to only include individuals who meet all three criteria or none
-Individuals <- meta_filtered %>% 
-  mutate(BMI_TF = ifelse(BMI >= 30, 1, 0),
-         waist_TF = ifelse(waist_circumference >= waist_circumference_threshold, 1, 0),
-         bodyfat_TF = ifelse((gender == "male" & Body_Fat_Percentage >= 25) | 
-                               (gender == "female" & Body_Fat_Percentage >= 30), 1, 0)) %>% 
-  mutate(number_T = sum(BMI_TF, waist_TF, bodyfat_TF)) %>% 
-  filter(number_T == 3 | number_T == 0)
+meta_1 <- meta|>
+  filter(sex == "female") |>
+  filter(waist_circumference >= 80) |>
+  filter(Body_Fat_Percentage >= 25)
+meta_1 
+meta_2 <- meta|>
+  filter(sex == "male") |>
+  filter(waist_circumference >= 90) |>
+  filter(Body_Fat_Percentage >= 30)
+meta_2
+meta_data1 <- rbind(meta_1, meta_2) |>
+  mutate(obese = "yes")
+meta_data1
 
-# Filter the columns
-bmi <- Individuals$BMI
-body_fat_percentage <- Individuals$Body_Fat_Percentage
-waist_circumference <- Individuals$waist_circumference
+meta_3 <- meta|>
+  filter(sex == "female") |>
+  filter(waist_circumference <= 80) |>
+  filter(Body_Fat_Percentage <= 25)
+meta_3 
+meta_4 <- meta|>
+  filter(sex == "male") |>
+  filter(waist_circumference <= 90) |>
+  filter(Body_Fat_Percentage <= 30)
+meta_4
+meta_data2 <- rbind(meta_3, meta_4) |>
+  mutate(obese = "no")
+meta_data2
 
-# Make matrix
-data_matrix <- cbind(bmi, body_fat_percentage, waist_circumference)
+meta_data <- rbind(meta_data1, meta_data2)
+meta_data
 
-# Compute the Bray-Curtis dissimilarity matrix using vegan package
-bc_dissimilarity <- vegdist(data_matrix, method = "bray")
+otufp <- "feature-table.txt"
+otu_table <- read_delim(file = otufp, delim="\t", skip=1)
 
-# Perform PCoA on the dissimilarity matrix
-pcoa <- cmdscale(bc_dissimilarity, eig = TRUE, k = 3)
+taxfp <- "taxonomy.tsv"
+taxonomy <- read_delim(taxfp, delim="\t")
 
-# Extract the PCoA coordinates and add sample IDs
-pcoa_df <- data.frame(pcoa$points, row.names = row.names(data_matrix))
-colnames(pcoa_df) <- c("PC1", "PC2", "PC3", "Sample_ID")
+phylotreefp <- "tree.nwk"
+phylotree <- read.tree(phylotreefp)
 
-# Add sample group information to the PCoA coordinates
-pcoa_df <- pcoa_df %>% 
-  mutate(Group = ifelse(BMI >= 30 | (Body_Fat_Percentage >= 25 & gender == "male") | 
-                        (Body_Fat_Percentage >= 30 & gender == "female") | 
-                        (waist_circumference >= waist_circumference_threshold & gender == "male") | 
-                        (waist_circumference >= waist_circumference_threshold & gender == "female"), 
-                        "Obese", "Non-Obese"))
+#Format OTU table
+otu_mat <- as.matrix(otu_table[,-1])
+rownames(otu_mat) <- otu_table$`#OTU ID`
+OTU <- otu_table(otu_mat, taxa_are_rows = TRUE) 
 
-# Plot the PCoA
-ggplot(pcoa_df, aes(x = PC1, y = PC2, color = Group, shape = Group)) +
-  geom_point(size = 3) +
-  labs(title = "PCoA plot based on filtered participant data",
-       x = paste0("PC1 (", round(pcoa_eig[1]*100/sum(pcoa_eig), 1), "%)"),
-       y = paste0("PC2 (", round(pcoa_eig[2]*100/sum(pcoa_eig), 1), "%)"),
-       color = "Group", shape = "Group") +
-  theme_minimal()
+#Format metadata
+samp_df <- as.data.frame(meta_data[,-1])
+
+rownames(samp_df)<- meta_data$`#SampleID`
+SAMP <- sample_data(samp_df) 
+class(SAMP)
+
+tax_mat <- taxonomy %>% select(-Confidence)%>%
+  separate(col=Taxon, sep="; "
+           , into = c("Domain","Phylum","Class","Order","Family","Genus","Species")) %>%
+  as.matrix()
+
+tax_mat <- tax_mat[,-1]
+rownames(tax_mat) <- taxonomy$`Feature ID`
+TAX <- tax_table(tax_mat)
+
+coloumbia <- phyloseq (OTU, SAMP, TAX, phylotree)
+otu_table(coloumbia)
+sample_data(coloumbia)
+tax_table(coloumbia)
+phy_tree(coloumbia)
+
+columbia_filt <- subset_taxa(coloumbia, Domain == "d__Bacteria" & Class!="c__Chloroplast" & Family !="f__Mitochondria")
+columbia_filt_nolow <- filter_taxa(columbia_filt, function(x) sum(x)>5, prune = TRUE)
+columbia_filt_nolow_samps <- prune_samples(sample_sums(columbia_filt_nolow)>100, columbia_filt_nolow)
+columbia_final <- columbia_filt_nolow_samps
+
+
+
+#rarecurve(t(as.data.frame(otu_table(columbia_final))), cex = 0.1)
+columbia_rare <- rarefy_even_depth(columbia_final,rngseed = 7, sample.size = 5000)
+
+save(columbia_final, file="columbia_final.RData")
+save(columbia_rare, file="columbia_rare.RData")
+
+#Load the files
+load("columbia_final.RData")
+load("columbia_rare.RData")
+summary(columbia_rare)
+
+bc_dm <- distance(columbia_rare, method="bray")
+
+pcoa_bc <- ordinate(columbia_final, method="PCoA", distance=bc_dm)
+
+gg_pcoa_rough <- plot_ordination(columbia_rare, pcoa_bc, color = "obese") +
+  labs(col = "Obese Status")
+gg_pcoa_rough
