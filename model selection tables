@@ -49,3 +49,21 @@ model_selection_alpha <- model_selection_alpha |>
   opt_row_striping()
 
 model_selection_alpha
+
+gtsave(model_selection_alpha, file = "model_selection_alpha.png")
+
+#### model selection beta table ####
+model_selection_beta <- read_excel("model_selection_data.xlsx", sheet="Sheet2") |>
+  gt()
+
+model_selection_beta <- model_selection_beta |>
+  tab_header(title = "Table 2: Beta-diversity Model Selection", 
+             subtitle = "Predictors that affect variance the most for beta diversity") |>
+  tab_options(table.font.name = "Arial") |>
+  fmt_number(columns = c("Variance explained (R2)", "P-value"), decimals = 5) |>
+  cols_align(align = "center", columns = "Variance explained (R2)") |>
+  opt_row_striping()
+
+model_selection_beta
+
+gtsave(model_selection_beta, file = "model_selection_beta.png")
