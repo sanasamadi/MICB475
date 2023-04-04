@@ -40,7 +40,7 @@ model_selection_alpha <- model_selection_alpha |>
   sub_values(values = 0.0157, replacement = "0.0157 *") |>
   fmt_number(columns = c("Estimate", "P.value"), decimals = 5) |>
   cols_width(everything()~px(150)) |>
-  cols_align(align = "center", columns = "P.value") |>
+  cols_align(align = "right", columns = "P.value") |>
   cols_label(P.value = md("P-value")) |>
   tab_footnote(footnote = "* (0.05), ** (0.01), and *** (<0.001)") |>
   opt_row_striping()
