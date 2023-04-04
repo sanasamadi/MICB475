@@ -29,7 +29,10 @@ model_selection_alpha <- data.frame(
 
 model_selection_alpha <- model_selection_alpha |>
   tab_header(title = "Table 1: Alpha-diversity Model Selection", 
-             subtitle = "Combination of predictors that best explain shannon diversity") |>
+             subtitle = ("Combination of predictors that best explain
+             Shannon diversity from 35 original variables 
+             (Starting AIC value =-165.53      Final AIC value = -204.59)")) |>
+  opt_align_table_header("left") |>
   tab_options(table.font.name = "Arial") |> 
   sub_values(values = 0.01299, replacement = "0.01299 *") |>
   sub_values(values = 0.0001, replacement = "0.0001 ***") |>
@@ -42,7 +45,7 @@ model_selection_alpha <- model_selection_alpha |>
   cols_width(everything()~px(150)) |>
   cols_align(align = "right", columns = "P.value") |>
   cols_label(P.value = md("P-value")) |>
-  tab_footnote(footnote = "* (0.05), ** (0.01), and *** (<0.001)") |>
+  tab_footnote(footnote = "* (0.05), ** (0.01), and *** (<0.001)")|>
   opt_row_striping()
 
 model_selection_alpha
