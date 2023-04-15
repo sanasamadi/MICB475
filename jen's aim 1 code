@@ -1,9 +1,15 @@
+# name required packages
+list.of.packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan", "RColorBrewer", "cowplot", "ggpubr")
+
+# install required packages if necessary, and load them
+{
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  lapply(list.of.packages, require, character.only = TRUE)
+}
+
 # setting seed for repeatable data
 set.seed(10001)
-
-# load packages
-req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan", "RColorBrewer", "cowplot")
-lapply(req_packages, library, character.only = TRUE)
 
 # extracting code for phyloseq object
 source("COLOMBIA_final.R")
@@ -11,19 +17,19 @@ source("COLOMBIA_final.R")
 ###### Extracting sample data ########
 sampdata <- data.frame(sample_data(COLOMBIA_final))
 
+# make vector of column names
+allPredictors <- colnames(sampdata)
+
 ######## Setting up richness loop ########
 # calculate richness metric
 estrich <- estimate_richness(COLOMBIA_final)
+# make a vector that is just shannon
+shannon_vec <- estrich$Shannon
 
 ######## Alpha diversity loop to test each individual predictor ###########
 # create new folder for alpha diversity if you want
 dir.create("AlphaDiversity")
 setwd("AlphaDiversity")
-
-# make vector of column names
-allPredictors <- colnames(sampdata)
-# make a vector that is just shannon
-shannon_vec <- estrich$Shannon
 
 ##### alpha diversity loop ######
 
@@ -60,7 +66,6 @@ results_table_alpha_filt <- results_table_alpha |>
 # view table
 results_table_alpha_filt
 
-
 # open file to save as txt format
 write.table(results_table_alpha_filt, file="results_table_alpha.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
@@ -89,12 +94,19 @@ dir.create("Aim 1 Figures")
 setwd("Aim 1 Figures")
 display.brewer.all(colorblindFriendly = T)
 
-adiponectin_plot <- plot_richness(COLOMBIA_final, x = "adiponectin", measures = c("Shannon"), color = "adiponectin") +
+adiponectin_plot <- plot_richness(COLOMBIA_final, x = "adiponectin", 
+                                  measures = c("Shannon"), color = "adiponectin") +
   theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
         axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15)) +
-  labs(x = "Adiponectin levels (µg/ml)", color = "Adiponectin", title = "Q2: Add title?")
-adiponectin_plot + scale_fill_brewer (palette = "Set2")
+        axis.title = element_text(size = 15),) +
+  labs(x = "Adiponectin levels (µg/ml)", color = "Adiponectin (µg/ml)") + 
+  scale_color_gradient(low="blue", high="pink")
+
+adiponectin_plot
+
+ggsave("alpha_adiponectin_figure.png", 
+       adiponectin_plot, 
+       height = 4, width = 6)
 
 #### plot for city ####
 city_plot <- plot_richness(COLOMBIA_final, x = "city", measures = c("Shannon"), color = "city") +
@@ -102,20 +114,29 @@ city_plot <- plot_richness(COLOMBIA_final, x = "city", measures = c("Shannon"), 
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 15)) +
   geom_boxplot(alpha = 0.5) +
-  labs(x = "City", title = "Plot in reference to Question 1") 
-city_plot + scale_fill_brewer (palette = "Set2")
+  stat_compare_means(method = "anova", label.y.npc = 0) +
+  labs(x = "City") 
+city_plot + scale_colour_brewer (palette = "Set2")
 
-ggsave(filename = paste0("Question_1_city_plot.png"), 
-       plot = city_plot, 
+ggsave("alpha_city_figure.png", 
+       city_plot, 
        height = 4, width = 6)
 
-#### pot for animal protein ####
-animalprotein_plot <- plot_richness(COLOMBIA_final, x = "per_animal_protein", measures = c("Shannon"), color = "adiponectin") +
+
+#### plot for animal protein ####
+animalprotein_plot <- plot_richness(COLOMBIA_final, x = "per_animal_protein", 
+                                    measures = c("Shannon"), color = "per_animal_protein") +
   theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 15)) +
-  labs(x = "Animal Protein (%)", color = "Animal Protein", title = "Q2: Add title?")
-animalprotein_plot + scale_fill_brewer (palette = "Set2")
+  labs(x = "Animal Protein (%)", color = "Animal Protein (%)") +
+  scale_color_gradient(low="blue", high="red")
+animalprotein_plot 
+
+ggsave("alpha_animalprotein_figure.png", 
+       animalprotein_plot, 
+       height = 4, width = 6)
+
 
 alpha_sig_plots <- plot_grid(adiponectin_plot, city_plot, animalprotein_plot, ncol = 3)
 alpha_sig_plots
@@ -215,7 +236,52 @@ results_table_unifrac_filt <- results_table_unifrac |>
 results_table_unifrac_filt
 
 # open file to save
-write.table(results_table_unifrac_filt, file="results_table_unifrac.txt", 
+write.table(results_table_unifrac_filt, file="results_table_unweighted_unifrac.txt", 
+            quote = FALSE, sep="\t", row.names = FALSE)
+
+
+#### PERMANOVA using weighted unifrac metric ####
+# object for distance matrix
+dm_weighted_unifrac <- UniFrac(COLOMBIA_final, weighted = TRUE)
+
+# creating data frame to store values
+results_table_weighted_unifrac <- data.frame()
+
+### loop ###
+for ( x in allPredictors ) {
+  
+  # making linear model
+  permanova_results <- adonis2(dm_weighted_unifrac ~ get(x), data = sampdata, permutations = 10000)
+  
+  # adjusting p values
+  adjusted_pvalues <- p.adjust(permanova_results$`Pr(>F)`, method = "BH")
+  permanova_results$`Pr(>F)` <- adjusted_pvalues
+  
+  #inserting values in data frame
+  new_results <- permanova_results |>
+    as.data.frame() |>
+    rownames_to_column(var="CoefficientName") |>
+    mutate(predictor = x, adjusted_pvalues)
+  results_table_weighted_unifrac <- rbind(results_table_weighted_unifrac, new_results)
+  
+}
+
+# view 
+results_table_weighted_unifrac
+
+# removing residual and total from table 
+results_table_weighted_unifrac_filt <- results_table_weighted_unifrac |>
+  subset(CoefficientName == "get(x)") |> 
+  rowwise() |> 
+  mutate(CoefficientName = gsub("get(x)", predictor, CoefficientName, fixed=TRUE)) |> 
+  ungroup() 
+
+
+# view table
+results_table_weighted_unifrac_filt
+
+# open file to save
+write.table(results_table_weighted_unifrac_filt, file="results_table_weighted_unifrac.txt", 
             quote = FALSE, sep="\t", row.names = FALSE)
 
 #!!! loop for beta diversity plots!!!
@@ -241,7 +307,7 @@ for (x in seq_along(allPredictors)) {
   
 }
 
-##### unifrac plots #####
+##### unweighted unifrac plots #####
 pcoa_dm_unifrac <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm_unifrac)
 
 unifrac_plots <- list()
@@ -256,11 +322,139 @@ unifrac_plots
 
 # save all plot objects 
 for (x in seq_along(allPredictors)) {
-  ggsave(filename = paste0("plot_pcoa_unifrac_", allPredictors[x], ".png"), 
+  ggsave(filename = paste0("plot_pcoa_weighted_unifrac_", allPredictors[x], ".png"), 
          plot = unifrac_plots[[x]], 
          height = 4, width = 6)
   
 }
+
+##### weighted unifrac plots #####
+pcoa_dm_weighted_unifrac <- ordinate(COLOMBIA_final, method = "PCoA", distance = dm_wighted_unifrac)
+
+weighted_unifrac_plots <- list()
+
+for (x in allPredictors) {
+  wunifrac_plots[[x]] <- plot_ordination(COLOMBIA_final, pcoa_dm_weighted_unifrac, color = x) +
+    labs(title = x)
+  
+}
+
+weighted_unifrac_plots
+
+#### plots that are significant for bray and unifrac (based off our obesitry metrics) ####
+#### bray pCoA plot BMI class ####
+bray_bmi_class <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = "BMI_class") +
+  labs(x = "PCo1 9.1%", y = "PCo2 8.4%", color = "BMI class") 
+bray_bmi_class + scale_fill_brewer (palette = "Set2")
+
+ggsave("bray_bmi_class.png", 
+       bray_bmi_class, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot BMI class ####
+unifrac_bmi_class <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "BMI_class") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "BMI class") 
+unifrac_bmi_class + scale_fill_brewer (palette = "Set2")
+
+ggsave("unifrac_bmi_class.png", 
+       unifrac_bmi_class, 
+       height = 4, width = 6)
+
+#### bray pCoA plot BMI ####
+bray_bmi <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = "BMI") +
+  labs(x = "PCo1 9.1%", y = "PCo2 8.4%", color = "BMI") 
+bray_bmi + scale_color_gradient(low="darkgreen", high="pink")
+bray_bmi
+
+ggsave("bray_bmi.png", 
+       bray_bmi, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot BMI ####
+unifrac_bmi <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "BMI") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "BMI") + 
+  scale_color_gradient(low="darkgreen", high="pink")
+unifrac_bmi 
+
+ggsave("unifrac_bmi.png", 
+       unifrac_bmi, 
+       height = 4, width = 6)
+
+#### bray pCoA plot fat % ####
+bray_bfp <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = "Body_Fat_Percentage") +
+  labs(x = "PCo1 9.1%", y = "PCo2 8.4%", color = "Body Fat Percentage") +
+  scale_color_gradient(low="darkgreen", high="pink") 
+bray_bfp
+
+ggsave("bray_bfp.png", 
+       bray_bfp, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot fat % ####
+unifrac_bfp <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "Body_Fat_Percentage") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "Body Fat Percentage") +
+  scale_color_gradient(low="blue", high="orange")
+unifrac_bfp 
+
+ggsave("unifrac_bfp.png", 
+       unifrac_bfp, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot stool ####
+unifrac_stool <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "stool_consistency") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "Stool Consistency") +
+  scale_color_discrete(labels = c("Diarrheic", "Hard", "Normal", "Soft")) +
+  scale_fill_brewer (palette = "Set2")+ 
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15))
+unifrac_stool 
+
+ggsave("unifrac_stool.png", 
+       unifrac_stool, 
+       height = 4, width = 6)
+
+#### bray pCoA plot waist ####
+bray_waist <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = "waist_circumference") +
+  labs(x = "PCo1 9.1%", y = "PCo2 8.4%", color = "Waist Circumference") 
+bray_waist 
+
+ggsave("bray_waist.png", 
+       bray_waist, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot waist ####
+unifrac_waist <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "waist_circumference") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "Waist Circumference") +
+  scale_color_gradient(low="darkgreen", high="pink") +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15))
+unifrac_waist
+
+ggsave("unifrac_waist.png", 
+       unifrac_waist, 
+       height = 4, width = 6)
+
+
+#### plots that model selection kept (from aim 2) ####
+#### bray pCoA plot city ####
+bray_city <- plot_ordination(COLOMBIA_final, pcoa_dm_bray, color = "city") +
+  labs(x = "PCo1 9.1%", y = "PCo2 8.4%", color = "City") 
+bray_city + scale_fill_brewer (palette = "Set2")
+
+ggsave("bray_city.png", 
+       bray_city, 
+       height = 4, width = 6)
+
+#### unifrac pCoA plot city ####
+unifrac_city <- plot_ordination(COLOMBIA_final, pcoa_dm_unifrac, color = "city") +
+  labs(x = "PCo1 5.6%", y = "PCo2 3.3%", color = "City") 
+unifrac_city + scale_fill_brewer (palette = "Set2")
+
+ggsave("unifrac_city.png", 
+       unifrac_city, 
+       height = 4, width = 6)
+
+
 
 # go back to parent directory if a new directory was made
 setwd("..")
