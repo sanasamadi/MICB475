@@ -1,6 +1,14 @@
-# load packages
-req_packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
-lapply(req_packages, library, character.only = TRUE)
+# name required packages
+list.of.packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan")
+
+# install required packages if necessary, and load them
+{
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  lapply(list.of.packages, require, character.only = TRUE)
+}
+
+###### COLOMBIA_final phyloseq object ###########
 
 # load data
 otu <- read_tsv("feature-table.txt", skip = 1)
@@ -11,7 +19,7 @@ phylotree <- read.tree("tree.nwk")
 # removing redundant columns
 select <- dplyr::select
 meta_select <- meta |>
-  select(-c(age_range, country))
+  select(-country)
 colnames(meta_select)
 
 #### Format OTU table ####
@@ -50,6 +58,12 @@ TAX <- tax_table(tax_mat)
 #### Create phyloseq object ####
 # merge all into a phyloseq object
 COLOMBIA <- phyloseq(OTU, SAMP, TAX, phylotree)
+
+# view components of phyloseq object with the following commands
+otu_table(COLOMBIA)
+sample_data(COLOMBIA)
+tax_table(COLOMBIA)
+phy_tree(COLOMBIA)
 
 # removing mitochondria and chloroplasts
 COLOMBIA_filt <- subset_taxa(COLOMBIA, Domain == "d__Bacteria" 
