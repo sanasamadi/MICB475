@@ -91,14 +91,11 @@ allPredictors <- colnames(sampdata)
 
 # make a model with ALL predictors
 model_full <- lm(shannon_vec ~ ., data = sampdata)
+AIC(model_full) # full model (all predictors)
 stepaic_results_nomed <- stepAIC(model_full)
-#stepaic_results_nomed <- as.data.frame(stepaic_results_nomed$anova)
 alpha_model_nomeds <- summary(stepaic_results_nomed)
 alpha_model_nomeds
 
-# comparing AIC values:
-AIC(model_full) # full model (all predictors)
-AIC(stepaic_results_nomed) # best fit model AIC
 
 capture.output(alpha_model_nomeds, file = "stepaic_alpha_nomeds.txt")
 
