@@ -18,7 +18,7 @@ Dataset comes from: https://doi.org/10.1038%2Fs41598-018-29687-x
 **Aim 3 includes code for:**
 - Aim 3. Model selection: alpha-diversity (linear model; Shannon Index) model selection of Colombia metadata (full model = 35 predictors)
 - Aim 3. Model selection: beta-diversity (PERMANOVA; weighted distance metric) model selection (full model = 35 predictors)
-*note: beta-diversity model selection code portion is suggested to be run as background job due to the extensive time it needs for computing (~12 hrs)*
+<br />*note: beta-diversity model selection code portion is suggested to be run as background job due to the extensive time it needs for computing (~12 hrs)*<br />
 - Aim 3: Tables S1-S4: supplemental model selection analysis code for manuscript
 - Aim 3: Model selection Tables: code used to create presentable tables for presentation
 - uses custom AIC code (AIC for adonis2) sourced from: https://github.com/kdyson/R_Scripts/blob/master/AICc_PERMANOVA.R 
