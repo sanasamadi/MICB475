@@ -88,7 +88,6 @@ AIC(model_full) # full model (all predictors)
 stepaic_results_nobfp <- stepAIC(model_full)
 alpha_model_nobfp <- summary(stepaic_results_nobfp)
 alpha_model_nobfp
-stepaic_results_nobfp <- as.data.frame(stepaic_results_noins_ormeds$anova)
 
 
 
