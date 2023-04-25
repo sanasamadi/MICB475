@@ -95,7 +95,6 @@ model_full <- lm(shannon_vec ~ ., data = sampdata)
 AIC(model_full) # full model (all predictors)
 stepaic_results_noins <- stepAIC(model_full)
 alpha_model_noins <- summary(stepaic_results)
-stepaic_results_noins <- as.data.frame(stepaic_results_noins$anova)
 
 
 
