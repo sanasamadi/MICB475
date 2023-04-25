@@ -71,3 +71,5 @@ COLOMBIA_filt <- subset_taxa(COLOMBIA, Domain == "d__Bacteria"
 
 # removing NA's from systolic bp entry
 COLOMBIA_final <- subset_samples(COLOMBIA_filt, !is.na(systolic_bp))
+
+
