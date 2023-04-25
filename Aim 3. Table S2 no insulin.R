@@ -17,7 +17,7 @@ meta <- read_tsv("colombia_metadata.txt")
 tax <- read_tsv("taxonomy.tsv")
 phylotree <- read.tree("tree.nwk")
 
-# removing redundant columns
+# removing insulin from metadata
 select <- dplyr::select
 meta_select <- meta |>
   select(-country, -insulin)
@@ -101,5 +101,4 @@ AIC(model_full) # full model (all predictors)
 AIC(stepaic_results_noins) # best fit model AIC
 
 capture.output(alpha_model_noins, file = "stepaic_alpha_noinsulin.txt")
-
 
