@@ -17,7 +17,7 @@ meta <- read_tsv("colombia_metadata.txt")
 tax <- read_tsv("taxonomy.tsv")
 phylotree <- read.tree("tree.nwk")
 
-# removing redundant columns
+# filtering out body fat percentage from metadata
 select <- dplyr::select
 meta_select <- meta |>
   select(-country, -Body_Fat_Percentage)
@@ -94,5 +94,3 @@ AIC(model_full) # full model (all predictors)
 AIC(stepaic_results_nobfp) # best fit model AIC
 
 capture.output(alpha_model_nobfp, file = "stepaic_alpha_nobfp.txt")
-
-capture.output(alpha_model_noins_ormeds, file = "stepaic_alpha_noinsulin_ormeds.txt")
