@@ -12,6 +12,7 @@ list.of.packages <- c("MASS", "phyloseq", "ape", "tidyverse", "vegan", "data.tab
 source("AIC_for_adonis2.R")
 source("COLOMBIA_final.R")
 
+
 # setting seed for repeatable data
 set.seed(10001)
 
@@ -38,17 +39,17 @@ allPredictors <- colnames(sampdata)
 # make a model with ALL predictors
 model_full <- lm(shannon_vec ~ ., data = sampdata)
 stepaic_results <- stepAIC(model_full)
-AIC(stepaic_results) # best fit model AIC
-stepaic_results <- as.data.frame(stepaic_results$anova)
 alpha_model <- summary(stepaic_results)
+alpha_model
+stepaic_results <- as.data.frame(stepaic_results$anova)
 
 # comparing AIC values:
 AIC(model_full) # full model (all predictors)
+AIC(stepaic_results) # best fit model AIC
 
 capture.output(alpha_model, file = "stepaic_alpha.txt")
 
 ######## stepAIC for PERMANOVA (unweighted unifrac) ##########
-
 
 #Create distance matrix response variable
 dm_unifrac <- UniFrac(COLOMBIA_no_na, weighted = TRUE)
@@ -60,6 +61,8 @@ frml_currentBest <- formula(paste0("dm_unifrac ~", paste0(currentPredictorSet, c
 permanova_results_currentBest <- adonis2(frml_currentBest, data=sampdata_filt, permutations = 10000)
 aic_currentBest <- AICc.PERMANOVA2(permanova_results_currentBest)
 aic_currentBest
+
+capture.output(aic_currentBest, file = "aic_currentBest_weighted.txt")
 
 #capture.output(permanova_results_currentBest, file = "unweighted_unifrac_full_model_results.txt")
 #capture.output(aic_currentBest, file = "aic_full_model_values.txt")
@@ -100,11 +103,4 @@ for ( d in allPredictors ) {
 permanova_best <- permanova_results_currentBest
 aic_best <- aic_currentBest
 
-
-
-
-
-
-
-
-
+capture.output(aic_best, file = "aic_final_model_weighted.txt")
