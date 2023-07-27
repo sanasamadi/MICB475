@@ -6,8 +6,13 @@ This GitHub repository contains code and data related to our research project, f
 Dataset Source:
 - https://doi.org/10.1038%2Fs41598-018-29687-x
 
-Qiime2 Files:
-- 
+## Qiime2 Code and Files:
+
+- Qiime2 Code.sh
+- colombia_metadata.txt
+- feature-table.txt
+- taxonomy.tsv
+- tree.nwk
 
 ## Aim 1 - Alpha and Beta Diversity Analysis:
 
@@ -51,4 +56,5 @@ Qiime2 Files:
 We hope that the code and data provided here will be useful to the research community. Please feel free to explore the repository, and don't hesitate to contact us if you have any questions or feedback.
 
 Thank you for your interest in our work!
+
 
